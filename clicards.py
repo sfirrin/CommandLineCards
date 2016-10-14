@@ -1,60 +1,41 @@
 import os
-import re
+import ConfigParser
 import random
 
-def main():
-    # TODO: Allow user to save their note directories and choose between them by entering the index
-    # or entering a full path
-    path = raw_input( 'Enter the path of your notes, or nothing to use current path:\n' )
-    if path == '':
-        path = '/run/media/stephen/01D1F11567B88C10/googledrive/school/comp455/notes'
+def get_path_and_files( paths ):
+    for i in range( len( paths ) ):
+        print( str( i ) + ' - ' + paths[i] )
 
-    path_files = [ note for note in os.listdir( path ) ]
-
-    print('')
     while True:
-        for i in range( len( path_files ) ):
-            print( str(i) + ' - ' + path_files[ i ] )
+        try:
+            path_input = raw_input( 'Enter the number of the path, or another full path:\n' )
 
-        print('')
-        # TODO: Allow user to use cards from multiple files by entering '1 6 3 9' etc.
-        file_index = raw_input(
-            'Enter the number of the notes you would like to review, or "exit" to end execution:\n' )
-        if file_index == 'exit':
+            try:
+                # Check to see if the path input corresponds to a path in the config's input
+                path = paths[ int( path_input ) ]
+            except ValueError:
+                # If what was entered was not an index, treat it as a path
+                path = path_input
+
+            return path, [ note for note in os.listdir( path ) ]
+
+        except OSError:
+            print( 'I could not find that path. Please try again' )
+
+
+def get_response( prompt ):
+    user_response = ''
+    print( prompt )
+    while True:
+        current_response = raw_input( '>' )
+        user_response += current_response + '\n'
+        if current_response in [ 'add', 'flag', 'exit' ]:
             break
-        file_index = int( file_index )
+        # If the user has entered a response, give them more lines to type
+        if not current_response:
+            break
+    return user_response.strip()
 
-        with open( path + '/' + path_files[file_index], 'rb' ) as note_file:
-            note_contents = note_file.read()
-
-        split_notes = note_contents.split( '\n\n' )
-
-        notecards = []
-
-        for note in split_notes:
-            note_lines = note.split( '\n' )
-            clue = note_lines[0].replace( '# ', '' )
-            answer = '\n'.join(note_lines[1:])
-            if answer == '':
-                continue
-            notecards.append( [ clue, answer ] )
-        # pprint( notecards )
-
-
-        print( str( len( notecards ) ) + ' notes found' )
-
-        print( "Enter 'exit' to end review, 'flag' to flag a card for further review," )
-        print( "or 'add' to add lines to the notes file" )
-        # TODO: Store user answers to questions?, possibly compare their development over time
-
-        changed_notes = review_cards( notecards, note_contents )
-        print(changed_notes)
-
-
-        if changed_notes != note_contents:
-            with open( path + '/' + path_files[file_index], 'w+' ) as note_file:
-                note_file.write( changed_notes )
-                print('should have written')
 
 
 def review_cards(notecards, notes_text):
@@ -92,16 +73,62 @@ def review_cards(notecards, notes_text):
     return notes_text
 
 
-def get_response( prompt ):
-    user_response = ''
-    print( prompt )
+def get_notecards( note_contents ):
+    split_notes = note_contents.split('\n\n')
+
+    notecards = []
+
+    for note in split_notes:
+        note_lines = note.split('\n')
+        clue = note_lines[0].replace('# ', '')
+        answer = '\n'.join(note_lines[1:])
+        if answer == '':
+            continue
+        notecards.append([clue, answer])
+
+    return notecards
+
+
+def main():
+
+    config = ConfigParser.ConfigParser()
+    config.read('config.ini')
+    paths = [ pair[1] for pair in config.items( 'paths' ) ]
+
+    path, path_files = get_path_and_files( paths )
+
+    print('')
+
     while True:
-        current_response = raw_input( '>' )
-        # If the user has entered a response, give them more lines to type
-        if not current_response:
+        for i in range( len( path_files ) ):
+            print( str(i) + ' - ' + path_files[ i ] )
+
+        print('')
+        # TODO: Allow user to use cards from multiple files by entering '1 6 3 9' etc.
+        file_index = raw_input(
+            'Enter the number of the notes you would like to review, or "exit" to end execution:\n' )
+        if file_index == 'exit':
             break
-        user_response += current_response + '\n'
-    return user_response.strip()
+        file_index = int( file_index )
+
+        with open( path + '/' + path_files[file_index], 'rb' ) as note_file:
+            note_contents = note_file.read()
+
+        notecards = get_notecards( note_contents )
+
+        print( str( len( notecards ) ) + ' notes found' )
+
+        print( "Enter 'exit' to end review, 'flag' to flag a card for further review,"
+               " or 'add' to add lines to the notes file" )
+
+        # TODO: Store user answers to questions?, possibly compare their development over time
+
+        changed_notes = review_cards( notecards, note_contents )
+
+        if changed_notes != note_contents:
+            with open( path + '/' + path_files[file_index], 'w+' ) as note_file:
+                note_file.write( changed_notes )
+
 
 if __name__ == '__main__':
     main()
